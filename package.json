@@ -1,0 +1,17 @@
+{
+  "name": "router-usage-tracker",
+  "version": "1.0.0",
+  "description": "Polls the HG8145X7-10 (MTN) router's web UI for Wi-Fi traffic stats and stores cumulative usage in a local SQLite DB.",
+  "type": "module",
+  "scripts": {
+    "poll": "node poller.js",
+    "poll:debug": "HEADFUL=1 node poller.js",
+    "report": "node report.js",
+    "dashboard": "node dashboard.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.47.0"
+  }
+}

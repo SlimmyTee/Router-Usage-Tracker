@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Credentials — never commit
+.env
+
+# Local data: usage database and poll logs (private)
+data/
+*.sqlite
+
+# Local tooling
+.claude/
+
+# OS
+.DS_Store

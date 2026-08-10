@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internet Usage</title>
+<style>
+  :root { color-scheme: light dark; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --warning: #fab219;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 24px;
+    max-width: 1060px;
+    margin: 0 auto;
+  }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 6px; }
+  h1 { font-size: 20px; font-weight: 650; }
+  .updated { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+  .freshness { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--text-secondary); font-size: 12.5px; margin-bottom: 18px; }
+  .freshness span.stale { color: var(--warning); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .tile .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .tile .value { font-size: 26px; font-weight: 650; letter-spacing: -0.01em; }
+  .tile .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  section.card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 10px; }
+  .card-head h2 { font-size: 14px; font-weight: 650; }
+  .legend { display: flex; gap: 14px; margin-left: auto; font-size: 12.5px; color: var(--text-secondary); }
+  .legend .chip, .freshness .chip, .tt .chip {
+    display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px;
+  }
+  .chart-wrap { position: relative; }
+  svg text { font-family: inherit; }
+
+  .tt {
+    position: fixed; z-index: 10; pointer-events: none; display: none;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    padding: 9px 11px; font-size: 12.5px; min-width: 190px;
+  }
+  .tt .tt-title { font-weight: 650; margin-bottom: 5px; }
+  .tt .row { display: flex; align-items: center; gap: 6px; padding: 1.5px 0; color: var(--text-secondary); }
+  .tt .row .val { margin-left: auto; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .tt .row.total { border-top: 1px solid var(--grid); margin-top: 5px; padding-top: 5px; }
+
+  .tables { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: right; color: var(--text-secondary); font-weight: 550; padding: 6px 10px; border-bottom: 1px solid var(--baseline); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .empty { color: var(--text-muted); font-size: 13px; padding: 24px 0; text-align: center; }
+</style>
+</head>
+<body class="viz-root">
+  <header>
+    <h1>Internet Usage</h1>
+    <span class="updated" id="updated"></span>
+  </header>
+  <div class="freshness" id="freshness"></div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Daily usage — last 30 days</h2>
+      <div class="legend" id="legend-daily"></div>
+    </div>
+    <div class="chart-wrap"><div id="chart-daily"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Monthly usage</h2>
+      <div class="legend" id="legend-monthly"></div>
+    </div>
+    <div class="chart-wrap"><div id="chart-monthly"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Monthly breakdown</h2></div>
+    <div class="tables">
+      <div class="table-scroll"><table id="table-monthly"></table></div>
+    </div>
+  </section>
+
+  <div class="tt" id="tt"></div>
+
+<script>
+const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
+const GB = 1024 ** 3;
+
+function fmt(bytes) {
+  if (bytes >= 100 * GB) return (bytes / GB).toFixed(0) + " GB";
+  if (bytes >= GB) return (bytes / GB).toFixed(1) + " GB";
+  return (bytes / 1024 ** 2).toFixed(0) + " MB";
+}
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+let DATA = null;
+
+// Group rows [{bucket, router, down_bytes, up_bytes}] into ordered buckets
+// ascending, one entry per bucket with a per-router map.
+function toBuckets(rows, key) {
+  const map = new Map();
+  for (const r of rows) {
+    if (!map.has(r[key])) map.set(r[key], { label: r[key], perRouter: {}, total: 0 });
+    const b = map.get(r[key]);
+    b.perRouter[r.router] = { down: r.down_bytes, up: r.up_bytes };
+    b.total += r.down_bytes + r.up_bytes;
+  }
+  return [...map.values()].sort((a, b) => (a.label < b.label ? -1 : 1));
+}
+
+function niceMax(v) {
+  if (v <= 0) return 1;
+  const pow = 10 ** Math.floor(Math.log10(v));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * pow >= v) return m * pow;
+  return 10 * pow;
+}
+
+function dayLabel(iso) {
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+function monthLabel(ym) {
+  const d = new Date(ym + "-15T12:00:00");
+  return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+}
+
+function roundedTopRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h} Z`;
+}
+
+function renderChart(el, buckets, labelFn, sparseEvery) {
+  const routers = DATA.routers;
+  const width = el.clientWidth || 900;
+  const height = 240;
+  const pad = { top: 12, right: 8, bottom: 26, left: 46 };
+  const iw = width - pad.left - pad.right;
+  const ih = height - pad.top - pad.bottom;
+  const maxGB = niceMax(Math.max(...buckets.map((b) => b.total), 1) / GB);
+  const yOf = (bytes) => pad.top + ih - (bytes / GB / maxGB) * ih;
+
+  const n = buckets.length;
+  const slot = iw / Math.max(n, 1);
+  const barW = Math.max(4, Math.min(26, slot * 0.62));
+  const gap = 2; // surface gap between stacked segments
+
+  let s = "";
+  // hairline gridlines + muted y labels
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const val = (maxGB / ticks) * t;
+    const y = yOf(val * GB);
+    s += `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y}" y2="${y}" stroke="${t === 0 ? "var(--baseline)" : "var(--grid)"}" stroke-width="1"/>`;
+    if (t > 0) s += `<text x="${pad.left - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${val % 1 ? val.toFixed(1) : val} GB</text>`;
+  }
+
+  buckets.forEach((b, i) => {
+    const x = pad.left + slot * i + (slot - barW) / 2;
+    let yCursor = pad.top + ih;
+    const segs = [];
+    routers.forEach((r) => {
+      const v = b.perRouter[r.key];
+      const bytes = v ? v.down + v.up : 0;
+      if (bytes <= 0) return;
+      const hRaw = (bytes / GB / maxGB) * ih;
+      segs.push({ slot: r.slot, hRaw });
+    });
+    segs.forEach((seg, j) => {
+      const isTop = j === segs.length - 1;
+      const g = j > 0 ? gap : 0;
+      const h = Math.max(1, seg.hRaw - g);
+      const y = yCursor - seg.hRaw;
+      const color = SERIES[seg.slot % SERIES.length];
+      s += isTop
+        ? `<path d="${roundedTopRect(x, y, barW, h, 3)}" fill="${color}"/>`
+        : `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${color}"/>`;
+      yCursor -= seg.hRaw;
+    });
+    if (i % sparseEvery === 0 || n <= 14) {
+      s += `<text x="${x + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${esc(labelFn(b.label))}</text>`;
+    }
+    // full-height hover target, wider than the mark
+    s += `<rect class="hit" data-i="${i}" x="${pad.left + slot * i}" y="${pad.top}" width="${slot}" height="${ih}" fill="transparent"/>`;
+  });
+
+  el.innerHTML = `<svg width="${width}" height="${height}" role="img" aria-label="Stacked bar chart of usage">${s}</svg>`;
+
+  const tt = document.getElementById("tt");
+  el.querySelectorAll(".hit").forEach((hit) => {
+    hit.addEventListener("mousemove", (e) => {
+      const b = buckets[+hit.dataset.i];
+      let rows = "";
+      DATA.routers.forEach((r) => {
+        const v = b.perRouter[r.key];
+        if (!v) return;
+        rows += `<div class="row"><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)}<span class="val">↓ ${fmt(v.down)} · ↑ ${fmt(v.up)}</span></div>`;
+      });
+      rows += `<div class="row total">Total<span class="val">${fmt(b.total)}</span></div>`;
+      tt.innerHTML = `<div class="tt-title">${esc(labelFn(b.label))}</div>${rows}`;
+      tt.style.display = "block";
+      const w = tt.offsetWidth, h = tt.offsetHeight;
+      tt.style.left = Math.min(e.clientX + 14, window.innerWidth - w - 8) + "px";
+      tt.style.top = Math.min(e.clientY + 14, window.innerHeight - h - 8) + "px";
+    });
+    hit.addEventListener("mouseleave", () => (tt.style.display = "none"));
+  });
+}
+
+function renderLegend(el) {
+  el.innerHTML = DATA.routers
+    .map((r) => `<span><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)}</span>`)
+    .join("");
+}
+
+function render() {
+  const { routers, allTime, monthly, lastSeen } = DATA;
+  const nameOf = Object.fromEntries(routers.map((r) => [r.key, r.name]));
+
+  // freshness
+  document.getElementById("freshness").innerHTML = routers
+    .map((r) => {
+      const seen = lastSeen.find((l) => l.router === r.key);
+      if (!seen) return `<span><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)} · no data</span>`;
+      const mins = Math.round((Date.now() - new Date(seen.updated_at)) / 60000);
+      const ago = mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
+      const stale = mins > 45;
+      return `<span><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)} · last poll ${ago}${stale ? ' <span class="stale">⚠ stale</span>' : ""}</span>`;
+    })
+    .join("");
+
+  // stat tiles
+  const totDown = allTime.reduce((s, r) => s + r.down_bytes, 0);
+  const totUp = allTime.reduce((s, r) => s + r.up_bytes, 0);
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const monthRows = monthly.filter((m) => m.month === thisMonth);
+  const mDown = monthRows.reduce((s, r) => s + r.down_bytes, 0);
+  const mUp = monthRows.reduce((s, r) => s + r.up_bytes, 0);
+  document.getElementById("tiles").innerHTML = `
+    <div class="tile"><div class="label">This month</div><div class="value">${fmt(mDown + mUp)}</div><div class="sub">↓ ${fmt(mDown)} · ↑ ${fmt(mUp)}</div></div>
+    <div class="tile"><div class="label">All-time total</div><div class="value">${fmt(totDown + totUp)}</div><div class="sub">↓ ${fmt(totDown)} · ↑ ${fmt(totUp)}</div></div>
+    ${allTime
+      .map((r) => {
+        const slot = routers.find((x) => x.key === r.router)?.slot ?? 0;
+        return `<div class="tile"><div class="label"><span class="chip" style="background:${SERIES[slot % SERIES.length]}"></span>${esc(nameOf[r.router] || r.router)}</div><div class="value">${fmt(r.down_bytes + r.up_bytes)}</div><div class="sub">↓ ${fmt(r.down_bytes)} · ↑ ${fmt(r.up_bytes)}</div></div>`;
+      })
+      .join("")}`;
+
+  renderLegend(document.getElementById("legend-daily"));
+  renderLegend(document.getElementById("legend-monthly"));
+
+  const daily = toBuckets(DATA.daily, "date");
+  const monthlyB = toBuckets(DATA.monthly, "month");
+  const dEl = document.getElementById("chart-daily");
+  const mEl = document.getElementById("chart-monthly");
+  if (daily.length) renderChart(dEl, daily, dayLabel, 5);
+  else dEl.innerHTML = '<div class="empty">No data yet — run a poll first.</div>';
+  if (monthlyB.length) renderChart(mEl, monthlyB, monthLabel, 1);
+  else mEl.innerHTML = '<div class="empty">No data yet.</div>';
+
+  // monthly table
+  const cols = routers.map((r) => r.name);
+  let thead = `<tr><th>Month</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}<th>Down</th><th>Up</th><th>Total</th></tr>`;
+  let rows = [...monthlyB].reverse().map((b) => {
+    const per = routers.map((r) => {
+      const v = b.perRouter[r.key];
+      return `<td>${v ? fmt(v.down + v.up) : "—"}</td>`;
+    }).join("");
+    const down = routers.reduce((s, r) => s + (b.perRouter[r.key]?.down || 0), 0);
+    const up = routers.reduce((s, r) => s + (b.perRouter[r.key]?.up || 0), 0);
+    return `<tr><td>${esc(monthLabel(b.label))}</td>${per}<td>${fmt(down)}</td><td>${fmt(up)}</td><td><strong>${fmt(down + up)}</strong></td></tr>`;
+  }).join("");
+  document.getElementById("table-monthly").innerHTML = thead + rows;
+
+  document.getElementById("updated").textContent =
+    "updated " + new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+async function refresh() {
+  try {
+    DATA = await (await fetch("/api/data")).json();
+    render();
+  } catch (e) {
+    document.getElementById("updated").textContent = "refresh failed — is the server running?";
+  }
+}
+
+refresh();
+setInterval(refresh, 60000);
+addEventListener("resize", () => DATA && render());
+</script>
+</body>
+</html>
