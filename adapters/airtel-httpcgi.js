@@ -93,7 +93,63 @@ export async function poll({ url, username, password }) {
     if (process.env.DEBUG_AIRTEL) {
       console.log("FLOW_INFO raw:", JSON.stringify(flow, null, 2));
     }
-    return pickCounters(flow);
+    const readings = pickCounters(flow);
+
+    let devices = [];
+    try {
+      const dhcpRes = await post(base, { cmd: 223, method: "GET", sessionId });
+      const wifi24Res = await post(base, { cmd: 224, method: "GET", sessionId });
+      const wifi5Res = await post(base, { cmd: 225, method: "GET", sessionId });
+
+      const dhcpList = dhcpRes.dhcp_list_info || [];
+      const wifi24List = wifi24Res.wlan24g_wifi_info || [];
+      const wifi5List = wifi5Res.wlan5g_wifi_info || [];
+
+      const wifiMap = new Map();
+      for (const item of wifi24List) {
+        if (item.mac) {
+          wifiMap.set(item.mac.toLowerCase(), { band: "2.4GHz", ssid: item.ssid, rssi: item.rssi });
+        }
+      }
+      for (const item of wifi5List) {
+        if (item.mac) {
+          wifiMap.set(item.mac.toLowerCase(), { band: "5GHz", ssid: item.ssid, rssi: item.rssi });
+        }
+      }
+
+      for (const client of dhcpList) {
+        if (!client.mac) continue;
+        const macLower = client.mac.toLowerCase();
+        const wifiDetails = wifiMap.get(macLower);
+
+        let intf = client.interface || "lan";
+        let ssid = null;
+        let rssi = null;
+
+        if (wifiDetails) {
+          intf = wifiDetails.band;
+          ssid = wifiDetails.ssid || null;
+          rssi = wifiDetails.rssi != null && wifiDetails.rssi !== "" ? parseInt(wifiDetails.rssi, 10) : null;
+        } else if (intf === "wlan") {
+          intf = "Wi-Fi";
+        } else if (intf === "lan") {
+          intf = "Wired";
+        }
+
+        devices.push({
+          mac: client.mac,
+          ip: client.ip || "",
+          hostname: client.hostname || "",
+          interface: intf,
+          ssid,
+          rssi
+        });
+      }
+    } catch (devicesErr) {
+      console.warn("Failed to poll connected devices: " + (devicesErr.message || devicesErr));
+    }
+
+    return { readings, devices };
   } finally {
     // Best-effort logout so we don't hold one of the router's sessions.
     await post(base, {

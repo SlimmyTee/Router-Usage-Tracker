@@ -114,6 +114,52 @@
   td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
   tr:last-child td { border-bottom: none; }
   .empty { color: var(--text-muted); font-size: 13px; padding: 24px 0; text-align: center; }
+
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 550;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover {
+    border-color: var(--text-primary);
+  }
+  .tab-btn.active {
+    background: var(--text-primary);
+    color: var(--page);
+    border-color: var(--text-primary);
+  }
+  .badge {
+    display: inline-block;
+    padding: 2.5px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .badge.wlan {
+    background: rgba(42, 120, 214, 0.15);
+    color: var(--series-1);
+  }
+  .badge.lan {
+    background: rgba(27, 175, 122, 0.15);
+    color: var(--series-3);
+  }
+  .badge.wired {
+    background: rgba(137, 135, 129, 0.15);
+    color: var(--text-secondary);
+  }
+  .rssi-indicator {
+    font-weight: 500;
+  }
+  .rssi-good { color: var(--series-3); }
+  .rssi-fair { color: var(--warning); }
+  .rssi-poor { color: var(--series-2); }
 </style>
 </head>
 <body class="viz-root">
@@ -126,8 +172,12 @@
   <div class="tiles" id="tiles"></div>
 
   <section class="card">
-    <div class="card-head">
-      <h2>Daily usage — last 30 days</h2>
+    <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 8px;">
+      <h2 id="daily-chart-title" style="margin: 0;">Daily usage — last 30 days</h2>
+      <div style="display:flex; align-items:center; gap: 8px; margin-left: auto;">
+        <label for="month-filter" style="font-size:12.5px; color:var(--text-secondary);">View Month:</label>
+        <select id="month-filter" class="tab-btn" style="padding: 4px 8px;" onchange="onMonthFilterChange()"></select>
+      </div>
       <div class="legend" id="legend-daily"></div>
     </div>
     <div class="chart-wrap"><div id="chart-daily"></div></div>
@@ -145,6 +195,45 @@
     <div class="card-head"><h2>Monthly breakdown</h2></div>
     <div class="tables">
       <div class="table-scroll"><table id="table-monthly"></table></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 8px;">
+      <h2 style="margin: 0;">Connected Devices</h2>
+      <div style="display:flex; gap: 8px;">
+        <button id="btn-device-active" class="tab-btn active" onclick="switchDeviceTab('active')">Active Now</button>
+        <button id="btn-device-all" class="tab-btn" onclick="switchDeviceTab('all')">Device Registry</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="margin-top: 12px;">
+      <table id="table-devices-active">
+        <thead>
+          <tr>
+            <th style="text-align: left;">Device Name / Hostname</th>
+            <th>IP Address</th>
+            <th>MAC Address</th>
+            <th>Connection Band</th>
+            <th>SSID</th>
+            <th>Signal Strength</th>
+            <th>Last Seen</th>
+          </tr>
+        </thead>
+        <tbody id="devices-active-body"></tbody>
+      </table>
+      <table id="table-devices-all" style="display:none;">
+        <thead>
+          <tr>
+            <th style="text-align: left;">Device Name / Hostname</th>
+            <th>Latest IP</th>
+            <th>MAC Address</th>
+            <th>First Seen</th>
+            <th>Last Seen</th>
+            <th>Polls Online</th>
+          </tr>
+        </thead>
+        <tbody id="devices-all-body"></tbody>
+      </table>
     </div>
   </section>
 
@@ -294,7 +383,11 @@ function render() {
       const mins = Math.round((Date.now() - new Date(seen.updated_at)) / 60000);
       const ago = mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
       const stale = mins > 45;
-      return `<span><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)} · last poll ${ago}${stale ? ' <span class="stale">⚠ stale</span>' : ""}</span>`;
+      return `<span style="display:inline-flex; align-items:center; gap:6px;">
+        <span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>
+        ${esc(r.name)} · last poll ${ago}${stale ? ' <span class="stale">⚠ stale</span>' : ""}
+        <button class="tab-btn" style="padding:2px 6px; font-size:11px; margin-left:4px; font-weight:normal;" onclick="triggerPoll('${esc(r.key)}', this)">Fetch Now</button>
+      </span>`;
     })
     .join("");
 
@@ -305,8 +398,25 @@ function render() {
   const monthRows = monthly.filter((m) => m.month === thisMonth);
   const mDown = monthRows.reduce((s, r) => s + r.down_bytes, 0);
   const mUp = monthRows.reduce((s, r) => s + r.up_bytes, 0);
+
+  // daily average & projection
+  const curMonthTotal = mDown + mUp;
+  const now = new Date();
+  const dayOfMonth = now.getDate();
+  const year = now.getFullYear();
+  const monthIndex = now.getMonth();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const dailyAvg = curMonthTotal / dayOfMonth;
+  const projected = dailyAvg * daysInMonth;
+  const subtextProj = `Avg: ${fmt(dailyAvg)}/day · Proj: ${fmt(projected)} (${dayOfMonth}/${daysInMonth}d)`;
+
   document.getElementById("tiles").innerHTML = `
-    <div class="tile"><div class="label">This month</div><div class="value">${fmt(mDown + mUp)}</div><div class="sub">↓ ${fmt(mDown)} · ↑ ${fmt(mUp)}</div></div>
+    <div class="tile">
+      <div class="label">This month</div>
+      <div class="value">${fmt(curMonthTotal)}</div>
+      <div class="sub">↓ ${fmt(mDown)} · ↑ ${fmt(mUp)}</div>
+      <div class="sub" style="margin-top: 4px; font-size: 11px; opacity: 0.85; border-top: 1px solid var(--border); padding-top: 4px;">${subtextProj}</div>
+    </div>
     <div class="tile"><div class="label">All-time total</div><div class="value">${fmt(totDown + totUp)}</div><div class="sub">↓ ${fmt(totDown)} · ↑ ${fmt(totUp)}</div></div>
     ${allTime
       .map((r) => {
@@ -318,14 +428,30 @@ function render() {
   renderLegend(document.getElementById("legend-daily"));
   renderLegend(document.getElementById("legend-monthly"));
 
-  const daily = toBuckets(DATA.daily, "date");
+  // Populate month filter dropdown
+  const monthFilter = document.getElementById("month-filter");
+  const selectedVal = monthFilter.value || "last30";
+  
+  const uniqueMonths = new Set();
+  (DATA.allDaily || []).forEach((d) => {
+    uniqueMonths.add(d.date.slice(0, 7));
+  });
+  const sortedMonths = Array.from(uniqueMonths).sort().reverse();
+  
+  let filterHtml = `<option value="last30">Last 30 Days</option>`;
+  sortedMonths.forEach((m) => {
+    const optLabel = new Date(m + "-15T12:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    filterHtml += `<option value="${m}">${optLabel}</option>`;
+  });
+  monthFilter.innerHTML = filterHtml;
+  monthFilter.value = selectedVal;
+
   const monthlyB = toBuckets(DATA.monthly, "month");
-  const dEl = document.getElementById("chart-daily");
   const mEl = document.getElementById("chart-monthly");
-  if (daily.length) renderChart(dEl, daily, dayLabel, 5);
-  else dEl.innerHTML = '<div class="empty">No data yet — run a poll first.</div>';
   if (monthlyB.length) renderChart(mEl, monthlyB, monthLabel, 1);
   else mEl.innerHTML = '<div class="empty">No data yet.</div>';
+
+  renderDailyChartAndFilter();
 
   // monthly table
   const cols = routers.map((r) => r.name);
@@ -343,7 +469,136 @@ function render() {
 
   document.getElementById("updated").textContent =
     "updated " + new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+  // Connected Devices rendering
+  const currentDevices = DATA.currentDevices || [];
+  const deviceRegistry = DATA.deviceRegistry || [];
+
+  // Render active devices
+  const activeBody = document.getElementById("devices-active-body");
+  if (currentDevices.length === 0) {
+    activeBody.innerHTML = '<tr><td colspan="7" class="empty">No active devices found. Poll your router to discover.</td></tr>';
+  } else {
+    activeBody.innerHTML = currentDevices.map((d) => {
+      const rssiVal = d.rssi;
+      let rssiHtml = "—";
+      if (rssiVal != null) {
+        let rClass = "rssi-good";
+        if (rssiVal < -80) rClass = "rssi-poor";
+        else if (rssiVal < -67) rClass = "rssi-fair";
+        rssiHtml = `<span class="rssi-indicator ${rClass}">${rssiVal} dBm</span>`;
+      }
+      
+      const isWlan = d.interface.includes("GHz") || d.interface === "Wi-Fi";
+      const badgeClass = isWlan ? "wlan" : (d.interface === "Wired" ? "lan" : "wired");
+      
+      const mins = Math.round((Date.now() - new Date(d.ts)) / 60000);
+      const ago = mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
+
+      return `<tr>
+        <td style="text-align: left; font-weight: 550;">${esc(d.hostname || "Unknown Device")}</td>
+        <td>${esc(d.ip)}</td>
+        <td style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${esc(d.mac)}</td>
+        <td><span class="badge ${badgeClass}">${esc(d.interface)}</span></td>
+        <td>${d.ssid ? esc(d.ssid) : "—"}</td>
+        <td>${rssiHtml}</td>
+        <td style="color: var(--text-muted);">${ago}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // Render all devices registry
+  const allBody = document.getElementById("devices-all-body");
+  if (deviceRegistry.length === 0) {
+    allBody.innerHTML = '<tr><td colspan="6" class="empty">No devices registered.</td></tr>';
+  } else {
+    allBody.innerHTML = deviceRegistry.map((d) => {
+      const firstSeen = new Date(d.first_seen).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      const lastSeen = new Date(d.last_seen).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      return `<tr>
+        <td style="text-align: left; font-weight: 550;">${esc(d.hostname || "Unknown Device")}</td>
+        <td>${esc(d.ip)}</td>
+        <td style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${esc(d.mac)}</td>
+        <td style="color: var(--text-muted);">${firstSeen}</td>
+        <td style="color: var(--text-muted);">${lastSeen}</td>
+        <td>${d.poll_count}</td>
+      </tr>`;
+    }).join("");
+  }
 }
+
+window.switchDeviceTab = function(tab) {
+  const activeTable = document.getElementById("table-devices-active");
+  const allTable = document.getElementById("table-devices-all");
+  const activeBtn = document.getElementById("btn-device-active");
+  const allBtn = document.getElementById("btn-device-all");
+
+  if (tab === "active") {
+    activeTable.style.display = "table";
+    allTable.style.display = "none";
+    activeBtn.classList.add("active");
+    allBtn.classList.remove("active");
+  } else {
+    activeTable.style.display = "none";
+    allTable.style.display = "table";
+    activeBtn.classList.remove("active");
+    allBtn.classList.add("active");
+  }
+};
+
+function renderDailyChartAndFilter() {
+  const monthFilter = document.getElementById("month-filter");
+  const filterVal = monthFilter.value || "last30";
+  const titleEl = document.getElementById("daily-chart-title");
+  const dEl = document.getElementById("chart-daily");
+  
+  let filteredDaily;
+  if (filterVal === "last30") {
+    filteredDaily = DATA.daily;
+    titleEl.textContent = "Daily usage — last 30 days";
+  } else {
+    filteredDaily = (DATA.allDaily || []).filter((d) => d.date.startsWith(filterVal));
+    const optLabel = new Date(filterVal + "-15T12:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    titleEl.textContent = `Daily usage — ${optLabel}`;
+  }
+  
+  const dailyBuckets = toBuckets(filteredDaily, "date");
+  if (dailyBuckets.length) {
+    const sparseEvery = filterVal === "last30" ? 5 : 4;
+    renderChart(dEl, dailyBuckets, dayLabel, sparseEvery);
+  } else {
+    dEl.innerHTML = '<div class="empty">No data for this period.</div>';
+  }
+}
+
+window.triggerPoll = async function(routerKey, btn) {
+  const originalText = btn.textContent;
+  btn.textContent = "Polling...";
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/poll?router=${encodeURIComponent(routerKey)}`);
+    const data = await res.json();
+    if (data.success) {
+      btn.textContent = "Success!";
+      await refresh();
+    } else {
+      btn.textContent = "Failed";
+      console.error(data.error);
+    }
+  } catch (e) {
+    btn.textContent = "Error";
+    console.error(e);
+  } finally {
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 2000);
+  }
+};
+
+window.onMonthFilterChange = function() {
+  renderDailyChartAndFilter();
+};
 
 async function refresh() {
   try {

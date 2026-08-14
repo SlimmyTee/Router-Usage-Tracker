@@ -10,6 +10,7 @@
     "dashboard": "node dashboard.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
     "playwright": "^1.47.0"

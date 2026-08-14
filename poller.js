@@ -1,5 +1,5 @@
 import { loadRouters } from "./config.js";
-import { recordReading } from "./db.js";
+import { recordReading, recordDevices } from "./db.js";
 
 const ADAPTERS = {
   "huawei-hg8145x7": () => import("./adapters/huawei-hg8145x7.js"),
@@ -34,9 +34,19 @@ for (const router of loadRouters()) {
 
   try {
     const { poll } = await load();
-    const readings = await poll(router);
+    const result = await poll(router);
+
+    let readings, devices;
+    if (Array.isArray(result)) {
+      readings = result;
+      devices = [];
+    } else {
+      readings = result.readings || [];
+      devices = result.devices || [];
+    }
+
     for (const { counter, downBytes, upBytes, note } of readings) {
-      const { downDelta, upDelta, resetDetected } = recordReading(
+      const { downDelta, upDelta, resetDetected } = await recordReading(
         router.key,
         counter,
         downBytes,
@@ -46,6 +56,11 @@ for (const router of loadRouters()) {
         `${label}/${counter}${note ? ` (${note})` : ""}: raw down=${downBytes} up=${upBytes} | delta down=${downDelta} up=${upDelta}` +
           (resetDetected ? " | RESET DETECTED (counter restarted: reboot or monthly clear)" : "")
       );
+    }
+
+    if (devices.length > 0) {
+      await recordDevices(router.key, devices);
+      log(`${label}: recorded ${devices.length} connected devices.`);
     }
   } catch (err) {
     console.error(`Poll failed for "${label}":`, err.message || err);
