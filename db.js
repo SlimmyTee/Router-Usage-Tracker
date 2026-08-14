@@ -58,16 +58,31 @@ const schema = [
   `CREATE INDEX IF NOT EXISTS idx_device_history_mac ON device_history(mac)`
 ];
 
-for (const stmt of schema) {
-  await client.execute(stmt);
-}
+let dbInitialized = false;
+async function ensureDbInitialized() {
+  if (dbInitialized) return;
 
-// WAL mode is only set if using a local file database
-if (!process.env.TURSO_DATABASE_URL) {
+  // If using Turso, assume tables are already set up (e.g. from imported SQLite)
+  // to prevent redundant HTTP round-trips on every serverless cold start.
+  if (process.env.TURSO_DATABASE_URL) {
+    dbInitialized = true;
+    return;
+  }
+
   try {
-    await client.execute("PRAGMA journal_mode = WAL");
+    for (const stmt of schema) {
+      await client.execute(stmt);
+    }
+    try {
+      await client.execute("PRAGMA journal_mode = WAL");
+    } catch (err) {
+      console.warn("Could not set WAL mode:", err.message);
+    }
+    await migrateLegacy();
+    dbInitialized = true;
   } catch (err) {
-    console.warn("Could not set WAL mode:", err.message);
+    console.error("Database lazy initialization failed:", err);
+    throw err;
   }
 }
 
@@ -123,8 +138,6 @@ async function migrateLegacy() {
   console.log("Migrated legacy single-router data (router='mtn').");
 }
 
-await migrateLegacy();
-
 function localDate(now) {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
@@ -135,6 +148,7 @@ function localDate(now) {
  * new value as a fresh delta rather than going negative.
  */
 export async function recordReading(router, counter, downBytes, upBytes) {
+  await ensureDbInitialized();
   const now = new Date();
   const ts = now.toISOString();
   const date = localDate(now);
@@ -190,6 +204,7 @@ export async function recordReading(router, counter, downBytes, upBytes) {
 }
 
 export async function getAllTimeByRouter() {
+  await ensureDbInitialized();
   const res = await client.execute(
     "SELECT router, SUM(down_bytes) AS down_bytes, SUM(up_bytes) AS up_bytes FROM daily_usage GROUP BY router ORDER BY router"
   );
@@ -201,6 +216,7 @@ export async function getAllTimeByRouter() {
 }
 
 export async function getDailyTotals(days = 30) {
+  await ensureDbInitialized();
   const res = await client.execute({
     sql: `SELECT date, router, SUM(down_bytes) AS down_bytes, SUM(up_bytes) AS up_bytes
           FROM daily_usage GROUP BY date, router ORDER BY date DESC LIMIT ?`,
@@ -215,6 +231,7 @@ export async function getDailyTotals(days = 30) {
 }
 
 export async function getAllDailyTotals() {
+  await ensureDbInitialized();
   const res = await client.execute(
     "SELECT date, router, SUM(down_bytes) AS down_bytes, SUM(up_bytes) AS up_bytes FROM daily_usage GROUP BY date, router ORDER BY date DESC"
   );
@@ -227,6 +244,7 @@ export async function getAllDailyTotals() {
 }
 
 export async function getMonthlyTotals(months = 12) {
+  await ensureDbInitialized();
   const res = await client.execute({
     sql: `SELECT substr(date, 1, 7) AS month, router, SUM(down_bytes) AS down_bytes, SUM(up_bytes) AS up_bytes
           FROM daily_usage GROUP BY month, router ORDER BY month DESC LIMIT ?`,
@@ -241,6 +259,7 @@ export async function getMonthlyTotals(months = 12) {
 }
 
 export async function getYearlyTotals() {
+  await ensureDbInitialized();
   const res = await client.execute(
     "SELECT substr(date, 1, 4) AS year, router, SUM(down_bytes) AS down_bytes, SUM(up_bytes) AS up_bytes FROM daily_usage GROUP BY year, router ORDER BY year DESC"
   );
@@ -253,6 +272,7 @@ export async function getYearlyTotals() {
 }
 
 export async function recordDevices(router, devices) {
+  await ensureDbInitialized();
   const ts = new Date().toISOString();
   const queries = devices.map((d) => ({
     sql: "INSERT OR IGNORE INTO device_history (ts, router, mac, ip, hostname, interface, ssid, rssi) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -273,6 +293,7 @@ export async function recordDevices(router, devices) {
 }
 
 export async function getCurrentDevices() {
+  await ensureDbInitialized();
   const res = await client.execute(`
     WITH latest_polls AS (
       SELECT router, MAX(ts) AS max_ts
@@ -291,6 +312,7 @@ export async function getCurrentDevices() {
 }
 
 export async function getDeviceRegistry() {
+  await ensureDbInitialized();
   const res = await client.execute(`
     WITH device_aggregates AS (
       SELECT 
