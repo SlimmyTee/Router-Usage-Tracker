@@ -3,18 +3,25 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, "data");
-fs.mkdirSync(dataDir, { recursive: true });
-const localPath = path.join(dataDir, "usage.sqlite");
-
-const dbUrl = process.env.TURSO_DATABASE_URL || `file:${localPath}`;
+const dbUrl = process.env.TURSO_DATABASE_URL;
 const dbToken = process.env.TURSO_AUTH_TOKEN;
 
-const client = createClient({
-  url: dbUrl,
-  authToken: dbToken,
-});
+let client;
+if (dbUrl) {
+  client = createClient({
+    url: dbUrl,
+    authToken: dbToken,
+  });
+} else {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const dataDir = path.join(__dirname, "data");
+  fs.mkdirSync(dataDir, { recursive: true });
+  const localPath = path.join(dataDir, "usage.sqlite");
+
+  client = createClient({
+    url: `file:${localPath}`,
+  });
+}
 
 // Create tables schema
 const schema = [
