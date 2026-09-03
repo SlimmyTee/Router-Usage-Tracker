@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
 <title>Internet Usage</title>
 <style>
   :root { color-scheme: light dark; }
@@ -20,6 +24,10 @@
     --series-1: #2a78d6;
     --series-2: #eb6834;
     --series-3: #1baf7a;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .viz-root {
@@ -52,114 +60,329 @@
     --series-3: #199e70;
   }
 
-  * { box-sizing: border-box; margin: 0; }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
   body.viz-root {
     background: var(--page);
     color: var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    padding: max(20px, var(--safe-top)) max(20px, var(--safe-right)) max(28px, var(--safe-bottom)) max(20px, var(--safe-left));
     max-width: 1060px;
     margin: 0 auto;
+    min-height: 100dvh;
+    -webkit-text-size-adjust: 100%;
   }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 6px; }
-  h1 { font-size: 20px; font-weight: 650; }
-  .updated { color: var(--text-muted); font-size: 12px; margin-left: auto; }
-  .freshness { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--text-secondary); font-size: 12.5px; margin-bottom: 18px; }
-  .freshness span.stale { color: var(--warning); }
 
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin-bottom: 8px;
+  }
+  h1 { font-size: 21px; font-weight: 650; letter-spacing: -0.015em; }
+  .updated { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  
+  .freshness {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    margin-bottom: 18px;
+  }
+  .freshness span.stale { color: var(--warning); font-weight: 600; }
+  .freshness-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
   .tile {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
   }
-  .tile .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
-  .tile .value { font-size: 26px; font-weight: 650; letter-spacing: -0.01em; }
-  .tile .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .tile .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500; }
+  .tile .value { font-size: 25px; font-weight: 650; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+  .tile .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
   section.card {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
+    border-radius: 12px;
+    padding: 16px 18px;
     margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
   }
-  .card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 10px; }
-  .card-head h2 { font-size: 14px; font-weight: 650; }
-  .legend { display: flex; gap: 14px; margin-left: auto; font-size: 12.5px; color: var(--text-secondary); }
+  .card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin-bottom: 14px;
+  }
+  .card-head h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+  .card-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--text-secondary); }
   .legend .chip, .freshness .chip, .tt .chip {
-    display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px;
+    display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle;
   }
-  .chart-wrap { position: relative; }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    overflow: visible;
+    touch-action: pan-y;
+  }
   svg text { font-family: inherit; }
 
   .tt {
-    position: fixed; z-index: 10; pointer-events: none; display: none;
-    background: var(--surface-1); color: var(--text-primary);
-    border: 1px solid var(--border); border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-    padding: 9px 11px; font-size: 12.5px; min-width: 190px;
+    position: fixed;
+    z-index: 999;
+    pointer-events: none;
+    display: none;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.20);
+    padding: 10px 12px;
+    font-size: 12.5px;
+    min-width: 190px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
-  .tt .tt-title { font-weight: 650; margin-bottom: 5px; }
-  .tt .row { display: flex; align-items: center; gap: 6px; padding: 1.5px 0; color: var(--text-secondary); }
-  .tt .row .val { margin-left: auto; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-  .tt .row.total { border-top: 1px solid var(--grid); margin-top: 5px; padding-top: 5px; }
+  .tt .tt-title { font-weight: 650; margin-bottom: 6px; font-size: 13px; }
+  .tt .row { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: var(--text-secondary); }
+  .tt .row .val { margin-left: auto; color: var(--text-primary); font-variant-numeric: tabular-nums; font-weight: 500; }
+  .tt .row.total { border-top: 1px solid var(--grid); margin-top: 6px; padding-top: 6px; font-weight: 600; }
 
   .tables { display: grid; grid-template-columns: 1fr; gap: 16px; }
-  .table-scroll { overflow-x: auto; }
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    position: relative;
+  }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  th { text-align: right; color: var(--text-secondary); font-weight: 550; padding: 6px 10px; border-bottom: 1px solid var(--baseline); white-space: nowrap; }
+  th {
+    text-align: right;
+    color: var(--text-secondary);
+    font-weight: 550;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--baseline);
+    white-space: nowrap;
+  }
   th:first-child, td:first-child { text-align: left; }
-  td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td {
+    text-align: right;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--grid);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
   tr:last-child td { border-bottom: none; }
-  .empty { color: var(--text-muted); font-size: 13px; padding: 24px 0; text-align: center; }
+  .empty { color: var(--text-muted); font-size: 13px; padding: 28px 0; text-align: center; }
 
   .tab-btn {
     background: transparent;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 12px;
-    font-size: 12.5px;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
     font-weight: 550;
     cursor: pointer;
     color: var(--text-secondary);
     transition: background 0.15s, color 0.15s, border-color 0.15s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
   }
-  .tab-btn:hover {
-    border-color: var(--text-primary);
-  }
+  .tab-btn:hover { border-color: var(--text-primary); color: var(--text-primary); }
   .tab-btn.active {
     background: var(--text-primary);
     color: var(--page);
     border-color: var(--text-primary);
   }
+
+  /* Custom styled select for iOS Safari (prevents auto-zoom) */
+  select.filter-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 32px 6px 12px;
+    font-size: 13px;
+    font-weight: 550;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23898781' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  select.filter-select:focus {
+    border-color: var(--text-primary);
+  }
+
   .badge {
     display: inline-block;
-    padding: 2.5px 7px;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border-radius: 5px;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.02em;
   }
-  .badge.wlan {
-    background: rgba(42, 120, 214, 0.15);
-    color: var(--series-1);
-  }
-  .badge.lan {
-    background: rgba(27, 175, 122, 0.15);
-    color: var(--series-3);
-  }
-  .badge.wired {
-    background: rgba(137, 135, 129, 0.15);
-    color: var(--text-secondary);
-  }
-  .rssi-indicator {
-    font-weight: 500;
-  }
+  .badge.wlan { background: rgba(42, 120, 214, 0.15); color: var(--series-1); }
+  .badge.lan { background: rgba(27, 175, 122, 0.15); color: var(--series-3); }
+  .badge.wired { background: rgba(137, 135, 129, 0.15); color: var(--text-secondary); }
+
+  .rssi-indicator { font-weight: 500; font-variant-numeric: tabular-nums; }
   .rssi-good { color: var(--series-3); }
   .rssi-fair { color: var(--warning); }
   .rssi-poor { color: var(--series-2); }
+
+  /* Mobile & Safari Optimizations */
+  @media (max-width: 640px) {
+    body.viz-root {
+      padding: max(14px, var(--safe-top)) max(14px, var(--safe-right)) max(22px, var(--safe-bottom)) max(14px, var(--safe-left));
+    }
+    header {
+      margin-bottom: 10px;
+    }
+    h1 { font-size: 19px; }
+    .updated { font-size: 11.5px; }
+
+    .freshness {
+      font-size: 12px;
+      gap: 8px 14px;
+      margin-bottom: 14px;
+    }
+    .freshness button.tab-btn {
+      padding: 4px 8px;
+      font-size: 11.5px;
+      min-height: 30px;
+    }
+
+    .tiles {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    /* First tile ("This month") spans full width on phones */
+    .tile:first-child {
+      grid-column: span 2;
+    }
+    .tile {
+      padding: 12px 14px;
+      border-radius: 10px;
+    }
+    .tile .value {
+      font-size: 22px;
+    }
+    .tile .label {
+      font-size: 11.5px;
+    }
+    .tile .sub {
+      font-size: 11px;
+    }
+
+    section.card {
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    .card-head {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .card-head-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      width: 100%;
+    }
+    .card-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      gap: 8px;
+    }
+    select.filter-select {
+      /* 16px font-size prevents iOS Safari from automatically zooming into the page */
+      font-size: 16px !important;
+      height: 38px;
+      min-height: 38px;
+      flex: 1;
+    }
+    .device-tabs {
+      display: flex;
+      width: 100%;
+      gap: 8px;
+    }
+    .device-tabs .tab-btn {
+      flex: 1;
+      min-height: 36px;
+      text-align: center;
+      padding: 6px 8px;
+    }
+
+    /* Sticky column for tables on horizontal swipe */
+    table th, table td {
+      padding: 8px 8px;
+      font-size: 12px;
+    }
+    table th:first-child, table td:first-child {
+      position: sticky;
+      left: 0;
+      background: var(--surface-1);
+      z-index: 2;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+    }
+    table th:first-child {
+      z-index: 3;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .tiles {
+      grid-template-columns: 1fr;
+    }
+    .tile:first-child {
+      grid-column: span 1;
+    }
+  }
 </style>
 </head>
 <body class="viz-root">
@@ -172,21 +395,25 @@
   <div class="tiles" id="tiles"></div>
 
   <section class="card">
-    <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 8px;">
-      <h2 id="daily-chart-title" style="margin: 0;">Daily usage — last 30 days</h2>
-      <div style="display:flex; align-items:center; gap: 8px; margin-left: auto;">
-        <label for="month-filter" style="font-size:12.5px; color:var(--text-secondary);">View Month:</label>
-        <select id="month-filter" class="tab-btn" style="padding: 4px 8px;" onchange="onMonthFilterChange()"></select>
+    <div class="card-head">
+      <div class="card-head-title-row">
+        <h2 id="daily-chart-title">Daily usage</h2>
+        <div class="legend" id="legend-daily"></div>
       </div>
-      <div class="legend" id="legend-daily"></div>
+      <div class="card-controls">
+        <label for="month-filter" style="font-size:12.5px; color:var(--text-secondary); white-space: nowrap;">View Period:</label>
+        <select id="month-filter" class="filter-select" onchange="onMonthFilterChange()"></select>
+      </div>
     </div>
     <div class="chart-wrap"><div id="chart-daily"></div></div>
   </section>
 
   <section class="card">
     <div class="card-head">
-      <h2>Monthly usage</h2>
-      <div class="legend" id="legend-monthly"></div>
+      <div class="card-head-title-row">
+        <h2>Monthly usage</h2>
+        <div class="legend" id="legend-monthly"></div>
+      </div>
     </div>
     <div class="chart-wrap"><div id="chart-monthly"></div></div>
   </section>
@@ -199,23 +426,25 @@
   </section>
 
   <section class="card">
-    <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap: 8px;">
-      <h2 style="margin: 0;">Connected Devices</h2>
-      <div style="display:flex; gap: 8px;">
+    <div class="card-head">
+      <div class="card-head-title-row">
+        <h2>Connected Devices</h2>
+      </div>
+      <div class="device-tabs">
         <button id="btn-device-active" class="tab-btn active" onclick="switchDeviceTab('active')">Active Now</button>
         <button id="btn-device-all" class="tab-btn" onclick="switchDeviceTab('all')">Device Registry</button>
       </div>
     </div>
-    <div class="table-scroll" style="margin-top: 12px;">
+    <div class="table-scroll" style="margin-top: 8px;">
       <table id="table-devices-active">
         <thead>
           <tr>
-            <th style="text-align: left;">Device Name / Hostname</th>
+            <th style="text-align: left;">Device Name</th>
             <th>IP Address</th>
             <th>MAC Address</th>
-            <th>Connection Band</th>
+            <th>Connection</th>
             <th>SSID</th>
-            <th>Signal Strength</th>
+            <th>Signal</th>
             <th>Last Seen</th>
           </tr>
         </thead>
@@ -224,7 +453,7 @@
       <table id="table-devices-all" style="display:none;">
         <thead>
           <tr>
-            <th style="text-align: left;">Device Name / Hostname</th>
+            <th style="text-align: left;">Device Name</th>
             <th>Latest IP</th>
             <th>MAC Address</th>
             <th>First Seen</th>
@@ -254,8 +483,7 @@ function esc(s) {
 
 let DATA = null;
 
-// Group rows [{bucket, router, down_bytes, up_bytes}] into ordered buckets
-// ascending, one entry per bucket with a per-router map.
+// Group rows [{bucket, router, down_bytes, up_bytes}] into ordered buckets ascending
 function toBuckets(rows, key) {
   const map = new Map();
   for (const r of rows) {
@@ -265,6 +493,31 @@ function toBuckets(rows, key) {
     b.total += r.down_bytes + r.up_bytes;
   }
   return [...map.values()].sort((a, b) => (a.label < b.label ? -1 : 1));
+}
+
+// Build continuous daily buckets for a given month (e.g. "2026-09")
+function getMonthDailyBuckets(rows, yearMonth, isCurrentMonth) {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const now = new Date();
+  const maxDay = isCurrentMonth && now.getFullYear() === y && (now.getMonth() + 1) === m
+    ? now.getDate()
+    : new Date(y, m, 0).getDate();
+
+  const map = new Map();
+  for (let d = 1; d <= maxDay; d++) {
+    const dayStr = `${yearMonth}-${String(d).padStart(2, "0")}`;
+    map.set(dayStr, { label: dayStr, perRouter: {}, total: 0 });
+  }
+
+  for (const r of rows) {
+    if (map.has(r.date)) {
+      const b = map.get(r.date);
+      b.perRouter[r.router] = { down: r.down_bytes, up: r.up_bytes };
+      b.total += r.down_bytes + r.up_bytes;
+    }
+  }
+
+  return [...map.values()];
 }
 
 function niceMax(v) {
@@ -291,8 +544,9 @@ function roundedTopRect(x, y, w, h, r) {
 function renderChart(el, buckets, labelFn, sparseEvery) {
   const routers = DATA.routers;
   const width = el.clientWidth || 900;
-  const height = 240;
-  const pad = { top: 12, right: 8, bottom: 26, left: 46 };
+  const isMobile = width < 500;
+  const height = isMobile ? 210 : 240;
+  const pad = { top: 14, right: 8, bottom: 26, left: isMobile ? 38 : 46 };
   const iw = width - pad.left - pad.right;
   const ih = height - pad.top - pad.bottom;
   const maxGB = niceMax(Math.max(...buckets.map((b) => b.total), 1) / GB);
@@ -300,18 +554,23 @@ function renderChart(el, buckets, labelFn, sparseEvery) {
 
   const n = buckets.length;
   const slot = iw / Math.max(n, 1);
-  const barW = Math.max(4, Math.min(26, slot * 0.62));
-  const gap = 2; // surface gap between stacked segments
+  const barW = Math.max(3, Math.min(26, slot * 0.65));
+  const gap = 2; // gap between stacked segments
 
   let s = "";
-  // hairline gridlines + muted y labels
   const ticks = 4;
   for (let t = 0; t <= ticks; t++) {
     const val = (maxGB / ticks) * t;
     const y = yOf(val * GB);
     s += `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y}" y2="${y}" stroke="${t === 0 ? "var(--baseline)" : "var(--grid)"}" stroke-width="1"/>`;
-    if (t > 0) s += `<text x="${pad.left - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${val % 1 ? val.toFixed(1) : val} GB</text>`;
+    if (t > 0) {
+      s += `<text x="${pad.left - 6}" y="${y + 4}" text-anchor="end" font-size="${isMobile ? 10 : 11}" fill="var(--text-muted)">${val % 1 ? val.toFixed(1) : val}G</text>`;
+    }
   }
+
+  // Calculate dynamic label step so text never overlaps on narrow screens
+  const maxLabels = isMobile ? 5 : (width < 768 ? 9 : 15);
+  const labelStep = Math.max(1, Math.ceil(n / maxLabels));
 
   buckets.forEach((b, i) => {
     const x = pad.left + slot * i + (slot - barW) / 2;
@@ -335,35 +594,73 @@ function renderChart(el, buckets, labelFn, sparseEvery) {
         : `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${color}"/>`;
       yCursor -= seg.hRaw;
     });
-    if (i % sparseEvery === 0 || n <= 14) {
-      s += `<text x="${x + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${esc(labelFn(b.label))}</text>`;
+
+    if (i % labelStep === 0 || i === n - 1) {
+      s += `<text x="${x + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="${isMobile ? 10 : 11}" fill="var(--text-muted)">${esc(labelFn(b.label))}</text>`;
     }
-    // full-height hover target, wider than the mark
-    s += `<rect class="hit" data-i="${i}" x="${pad.left + slot * i}" y="${pad.top}" width="${slot}" height="${ih}" fill="transparent"/>`;
+    // Full-height touch/hover target
+    s += `<rect class="hit" data-i="${i}" x="${pad.left + slot * i}" y="${pad.top}" width="${slot}" height="${ih}" fill="transparent" style="cursor:pointer;"/>`;
   });
 
   el.innerHTML = `<svg width="${width}" height="${height}" role="img" aria-label="Stacked bar chart of usage">${s}</svg>`;
 
   const tt = document.getElementById("tt");
-  el.querySelectorAll(".hit").forEach((hit) => {
-    hit.addEventListener("mousemove", (e) => {
-      const b = buckets[+hit.dataset.i];
-      let rows = "";
-      DATA.routers.forEach((r) => {
-        const v = b.perRouter[r.key];
-        if (!v) return;
-        rows += `<div class="row"><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)}<span class="val">↓ ${fmt(v.down)} · ↑ ${fmt(v.up)}</span></div>`;
-      });
-      rows += `<div class="row total">Total<span class="val">${fmt(b.total)}</span></div>`;
-      tt.innerHTML = `<div class="tt-title">${esc(labelFn(b.label))}</div>${rows}`;
-      tt.style.display = "block";
-      const w = tt.offsetWidth, h = tt.offsetHeight;
-      tt.style.left = Math.min(e.clientX + 14, window.innerWidth - w - 8) + "px";
-      tt.style.top = Math.min(e.clientY + 14, window.innerHeight - h - 8) + "px";
+
+  function showTooltip(hit, clientX, clientY) {
+    const b = buckets[+hit.dataset.i];
+    if (!b) return;
+    let rows = "";
+    DATA.routers.forEach((r) => {
+      const v = b.perRouter[r.key];
+      if (!v) return;
+      rows += `<div class="row"><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)}<span class="val">↓ ${fmt(v.down)} · ↑ ${fmt(v.up)}</span></div>`;
     });
+    rows += `<div class="row total">Total<span class="val">${fmt(b.total)}</span></div>`;
+    tt.innerHTML = `<div class="tt-title">${esc(labelFn(b.label))}</div>${rows}`;
+    tt.style.display = "block";
+    const w = tt.offsetWidth, h = tt.offsetHeight;
+
+    let left = clientX - w / 2;
+    if (left < 10) left = 10;
+    if (left + w > window.innerWidth - 10) left = window.innerWidth - w - 10;
+
+    let top = clientY - h - 16;
+    if (top < 10) top = clientY + 20;
+
+    tt.style.left = left + "px";
+    tt.style.top = top + "px";
+  }
+
+  el.querySelectorAll(".hit").forEach((hit) => {
+    hit.addEventListener("mousemove", (e) => showTooltip(hit, e.clientX, e.clientY));
     hit.addEventListener("mouseleave", () => (tt.style.display = "none"));
+
+    // Touch support for Mobile Safari
+    hit.addEventListener("touchstart", (e) => {
+      if (e.touches && e.touches[0]) {
+        showTooltip(hit, e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    hit.addEventListener("touchmove", (e) => {
+      if (e.touches && e.touches[0]) {
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (target && target.classList && target.classList.contains("hit")) {
+          showTooltip(target, touch.clientX, touch.clientY);
+        }
+      }
+    }, { passive: true });
   });
 }
+
+// Dismiss tooltip on tap outside on mobile
+document.addEventListener("touchstart", (e) => {
+  if (!e.target.closest(".hit") && !e.target.closest(".tt")) {
+    const tt = document.getElementById("tt");
+    if (tt) tt.style.display = "none";
+  }
+}, { passive: true });
 
 function renderLegend(el) {
   el.innerHTML = DATA.routers
@@ -375,23 +672,23 @@ function render() {
   const { routers, allTime, monthly, lastSeen } = DATA;
   const nameOf = Object.fromEntries(routers.map((r) => [r.key, r.name]));
 
-  // freshness
+  // Freshness bar
   document.getElementById("freshness").innerHTML = routers
     .map((r) => {
       const seen = lastSeen.find((l) => l.router === r.key);
-      if (!seen) return `<span><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)} · no data</span>`;
+      if (!seen) return `<span class="freshness-item"><span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>${esc(r.name)} · no data</span>`;
       const mins = Math.round((Date.now() - new Date(seen.updated_at)) / 60000);
       const ago = mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
       const stale = mins > 45;
-      return `<span style="display:inline-flex; align-items:center; gap:6px;">
+      return `<span class="freshness-item">
         <span class="chip" style="background:${SERIES[r.slot % SERIES.length]}"></span>
         ${esc(r.name)} · last poll ${ago}${stale ? ' <span class="stale">⚠ stale</span>' : ""}
-        <button class="tab-btn" style="padding:2px 6px; font-size:11px; margin-left:4px; font-weight:normal;" onclick="triggerPoll('${esc(r.key)}', this)">Fetch Now</button>
+        <button class="tab-btn" style="padding:2px 7px; font-size:11px; margin-left:4px; font-weight:normal;" onclick="triggerPoll('${esc(r.key)}', this)">Fetch Now</button>
       </span>`;
     })
     .join("");
 
-  // stat tiles
+  // Stat tiles
   const totDown = allTime.reduce((s, r) => s + r.down_bytes, 0);
   const totUp = allTime.reduce((s, r) => s + r.up_bytes, 0);
   const thisMonth = new Date().toISOString().slice(0, 7);
@@ -399,7 +696,7 @@ function render() {
   const mDown = monthRows.reduce((s, r) => s + r.down_bytes, 0);
   const mUp = monthRows.reduce((s, r) => s + r.up_bytes, 0);
 
-  // daily average & projection
+  // Daily average & projection
   const curMonthTotal = mDown + mUp;
   const now = new Date();
   const dayOfMonth = now.getDate();
@@ -415,7 +712,7 @@ function render() {
       <div class="label">This month</div>
       <div class="value">${fmt(curMonthTotal)}</div>
       <div class="sub">↓ ${fmt(mDown)} · ↑ ${fmt(mUp)}</div>
-      <div class="sub" style="margin-top: 4px; font-size: 11px; opacity: 0.85; border-top: 1px solid var(--border); padding-top: 4px;">${subtextProj}</div>
+      <div class="sub" style="margin-top: 6px; font-size: 11px; opacity: 0.9; border-top: 1px solid var(--border); padding-top: 6px;">${subtextProj}</div>
     </div>
     <div class="tile"><div class="label">All-time total</div><div class="value">${fmt(totDown + totUp)}</div><div class="sub">↓ ${fmt(totDown)} · ↑ ${fmt(totUp)}</div></div>
     ${allTime
@@ -428,24 +725,46 @@ function render() {
   renderLegend(document.getElementById("legend-daily"));
   renderLegend(document.getElementById("legend-monthly"));
 
-  // Populate month filter dropdown
+  // Check if a new month has started since the last session
+  const lastKnownMonth = localStorage.getItem("router_last_known_month");
+  if (lastKnownMonth !== thisMonth) {
+    localStorage.setItem("router_last_known_month", thisMonth);
+    // When a new month starts, automatically reset default to the new current month!
+    sessionStorage.setItem("router_usage_filter", thisMonth);
+  }
+
+  // Populate month filter dropdown: Default to This Month!
   const monthFilter = document.getElementById("month-filter");
-  const selectedVal = monthFilter.value || "last30";
-  
+  let selectedVal = sessionStorage.getItem("router_usage_filter");
+  if (!selectedVal) {
+    selectedVal = thisMonth;
+    sessionStorage.setItem("router_usage_filter", thisMonth);
+  }
+
   const uniqueMonths = new Set();
+  uniqueMonths.add(thisMonth);
   (DATA.allDaily || []).forEach((d) => {
     uniqueMonths.add(d.date.slice(0, 7));
   });
   const sortedMonths = Array.from(uniqueMonths).sort().reverse();
-  
-  let filterHtml = `<option value="last30">Last 30 Days</option>`;
+
+  let filterHtml = "";
+  // 1. Current month option
+  const thisMonthLabel = new Date(thisMonth + "-15T12:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" }) + " (This Month)";
+  filterHtml += `<option value="${thisMonth}">${thisMonthLabel}</option>`;
+  // 2. Rolling last 30 days option
+  filterHtml += `<option value="last30">Last 30 Days</option>`;
+  // 3. Historical months
   sortedMonths.forEach((m) => {
+    if (m === thisMonth) return;
     const optLabel = new Date(m + "-15T12:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
     filterHtml += `<option value="${m}">${optLabel}</option>`;
   });
+
   monthFilter.innerHTML = filterHtml;
   monthFilter.value = selectedVal;
 
+  // Monthly chart
   const monthlyB = toBuckets(DATA.monthly, "month");
   const mEl = document.getElementById("chart-monthly");
   if (monthlyB.length) renderChart(mEl, monthlyB, monthLabel, 1);
@@ -453,7 +772,7 @@ function render() {
 
   renderDailyChartAndFilter();
 
-  // monthly table
+  // Monthly table
   const cols = routers.map((r) => r.name);
   let thead = `<tr><th>Month</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}<th>Down</th><th>Up</th><th>Total</th></tr>`;
   let rows = [...monthlyB].reverse().map((b) => {
@@ -474,7 +793,6 @@ function render() {
   const currentDevices = DATA.currentDevices || [];
   const deviceRegistry = DATA.deviceRegistry || [];
 
-  // Render active devices
   const activeBody = document.getElementById("devices-active-body");
   if (currentDevices.length === 0) {
     activeBody.innerHTML = '<tr><td colspan="7" class="empty">No active devices found. Poll your router to discover.</td></tr>';
@@ -496,9 +814,9 @@ function render() {
       const ago = mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
 
       return `<tr>
-        <td style="text-align: left; font-weight: 550;">${esc(d.hostname || "Unknown Device")}</td>
+        <td style="font-weight: 550;">${esc(d.hostname || "Unknown Device")}</td>
         <td>${esc(d.ip)}</td>
-        <td style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${esc(d.mac)}</td>
+        <td style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; color: var(--text-muted);">${esc(d.mac)}</td>
         <td><span class="badge ${badgeClass}">${esc(d.interface)}</span></td>
         <td>${d.ssid ? esc(d.ssid) : "—"}</td>
         <td>${rssiHtml}</td>
@@ -507,7 +825,6 @@ function render() {
     }).join("");
   }
 
-  // Render all devices registry
   const allBody = document.getElementById("devices-all-body");
   if (deviceRegistry.length === 0) {
     allBody.innerHTML = '<tr><td colspan="6" class="empty">No devices registered.</td></tr>';
@@ -516,9 +833,9 @@ function render() {
       const firstSeen = new Date(d.first_seen).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
       const lastSeen = new Date(d.last_seen).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
       return `<tr>
-        <td style="text-align: left; font-weight: 550;">${esc(d.hostname || "Unknown Device")}</td>
+        <td style="font-weight: 550;">${esc(d.hostname || "Unknown Device")}</td>
         <td>${esc(d.ip)}</td>
-        <td style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${esc(d.mac)}</td>
+        <td style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; color: var(--text-muted);">${esc(d.mac)}</td>
         <td style="color: var(--text-muted);">${firstSeen}</td>
         <td style="color: var(--text-muted);">${lastSeen}</td>
         <td>${d.poll_count}</td>
@@ -547,25 +864,25 @@ window.switchDeviceTab = function(tab) {
 };
 
 function renderDailyChartAndFilter() {
+  const thisMonth = new Date().toISOString().slice(0, 7);
   const monthFilter = document.getElementById("month-filter");
-  const filterVal = monthFilter.value || "last30";
+  const filterVal = monthFilter.value || sessionStorage.getItem("router_usage_filter") || thisMonth;
   const titleEl = document.getElementById("daily-chart-title");
   const dEl = document.getElementById("chart-daily");
   
-  let filteredDaily;
+  let dailyBuckets;
   if (filterVal === "last30") {
-    filteredDaily = DATA.daily;
-    titleEl.textContent = "Daily usage — last 30 days";
+    titleEl.textContent = "Daily usage — Last 30 days";
+    dailyBuckets = toBuckets(DATA.daily || [], "date");
   } else {
-    filteredDaily = (DATA.allDaily || []).filter((d) => d.date.startsWith(filterVal));
+    const isThisMonth = filterVal === thisMonth;
     const optLabel = new Date(filterVal + "-15T12:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
-    titleEl.textContent = `Daily usage — ${optLabel}`;
+    titleEl.textContent = `Daily usage — ${optLabel}${isThisMonth ? " (This Month)" : ""}`;
+    dailyBuckets = getMonthDailyBuckets(DATA.allDaily || [], filterVal, isThisMonth);
   }
   
-  const dailyBuckets = toBuckets(filteredDaily, "date");
   if (dailyBuckets.length) {
-    const sparseEvery = filterVal === "last30" ? 5 : 4;
-    renderChart(dEl, dailyBuckets, dayLabel, sparseEvery);
+    renderChart(dEl, dailyBuckets, dayLabel, 1);
   } else {
     dEl.innerHTML = '<div class="empty">No data for this period.</div>';
   }
@@ -597,6 +914,8 @@ window.triggerPoll = async function(routerKey, btn) {
 };
 
 window.onMonthFilterChange = function() {
+  const monthFilter = document.getElementById("month-filter");
+  sessionStorage.setItem("router_usage_filter", monthFilter.value);
   renderDailyChartAndFilter();
 };
 
@@ -611,7 +930,12 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 60000);
-addEventListener("resize", () => DATA && render());
+
+let resizeTimer;
+addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => DATA && render(), 100);
+});
 </script>
 </body>
 </html>

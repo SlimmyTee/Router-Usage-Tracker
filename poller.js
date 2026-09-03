@@ -1,5 +1,6 @@
+import os from "node:os";
 import { loadRouters } from "./config.js";
-import { recordReading, recordDevices } from "./db.js";
+import { recordReading, recordDevices, acquirePollerLock, releasePollerLock } from "./db.js";
 
 const ADAPTERS = {
   "huawei-hg8145x7": () => import("./adapters/huawei-hg8145x7.js"),
@@ -12,6 +13,7 @@ function log(...args) {
 }
 
 const only = process.argv[2]; // optional: poll a single router by key
+const pollerId = process.env.POLLER_ID || os.hostname();
 
 let failed = false;
 for (const router of loadRouters()) {
@@ -29,6 +31,12 @@ for (const router of loadRouters()) {
   if (!load) {
     console.error(`Unknown router type "${router.type}" for "${label}". Known: ${Object.keys(ADAPTERS).join(", ")}`);
     failed = true;
+    continue;
+  }
+
+  const locked = await acquirePollerLock(router.key, pollerId, 120);
+  if (!locked) {
+    log(`Skipping "${label}": active lock held by another poller. Clash avoided.`);
     continue;
   }
 
@@ -65,6 +73,8 @@ for (const router of loadRouters()) {
   } catch (err) {
     console.error(`Poll failed for "${label}":`, err.message || err);
     failed = true;
+  } finally {
+    await releasePollerLock(router.key, pollerId).catch(() => {});
   }
 }
 

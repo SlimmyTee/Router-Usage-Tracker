@@ -35,7 +35,7 @@ function printBuckets(rows, bucketKey) {
   }
 }
 
-const allTime = getAllTimeByRouter();
+const allTime = await getAllTimeByRouter();
 console.log("=== All-time (since tracker started) ===");
 if (!allTime.length) {
   console.log("No data yet — run `npm run poll` at least once.");
@@ -56,10 +56,10 @@ if (!allTime.length) {
 }
 
 console.log("\n=== Last 30 days ===");
-printBuckets(getDailyTotals(30), "date");
+printBuckets(await getDailyTotals(30), "date");
 
 console.log("\n=== Monthly ===");
-printBuckets(getMonthlyTotals(12), "month");
+printBuckets(await getMonthlyTotals(12), "month");
 
 console.log("\n=== Yearly ===");
-printBuckets(getYearlyTotals(), "year");
+printBuckets(await getYearlyTotals(), "year");

@@ -9,7 +9,8 @@ import db, {
   getYearlyTotals,
   getCurrentDevices,
   getDeviceRegistry,
-  getAllDailyTotals
+  getAllDailyTotals,
+  getLastSeen
 } from "../db.js";
 import { loadRouters } from "../config.js";
 
@@ -23,7 +24,7 @@ async function apiData() {
     getDailyTotals(30),
     getMonthlyTotals(12),
     getYearlyTotals(),
-    db.execute(`SELECT router, MAX(updated_at) AS updated_at FROM last_counter GROUP BY router`),
+    getLastSeen(),
     getCurrentDevices(),
     getDeviceRegistry(),
     getAllDailyTotals(),
